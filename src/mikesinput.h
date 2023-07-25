@@ -9,8 +9,9 @@
 #include <linux/input.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdbool.h>
 
-#define ERR_BAD_DEV_PATH(path) (printf("[MikesInput] Could not open dev path: %s", path))
+#define ERR_BAD_DEV_PATH(path) (printf("[MikesInput] Could not open dev path: %s\n", path))
 
 #define BITS_PER_LONG (8 * sizeof(long))
 #define NBITS(x) ((((x)-1) / BITS_PER_LONG) + 1)
@@ -26,6 +27,10 @@ typedef struct
 {
     int fd;
 
+    bool has_abs;
+    bool has_rel;
+    bool has_abs_multi;
+
     // Used for absolute input events
     float x_min;
     float x_max;
@@ -36,7 +41,7 @@ typedef struct
 mikesinput_dev devices[64] = {0};
 
 void mikesinput_init(void);
-void mikesinput_init_device(char *path);
+mikesinput_dev *mikesinput_init_device(char *path);
 
 /**
  * Many devices (power buttons, webcams) can show up as keyboards.
@@ -61,19 +66,20 @@ void mikesinput_init(void)
         {
             if ((strncmp("event", ent->d_name, strlen("event")) == 0))
             {
-                sprintf(path, "%s%s", MIKESINPUT_DEV_PATH, ent->d_name);
-                mikesinput_init_device(path);
+                sprintf(path, "%s/%s", MIKESINPUT_DEV_PATH, ent->d_name);
+                mikesinput_dev *device = mikesinput_init_device(path);
+                if (device != NULL) 
+                {
+                    printf("Found input device: %d\n", device->fd);
+                    printf("Has abs: %d\nHas rel: %d\nHas abs multi: %d\n", device->has_abs, device->has_rel, device->has_abs_multi);
+                }
             }
         }
     }
 }
 
-void mikesinput_init_device(char *path)
+mikesinput_dev *mikesinput_init_device(char *path)
 {
-    bool has_abs = false;
-    bool has_rel = false;
-    bool has_abs_multi = false;
-    
     mikesinput_dev *device = (mikesinput_dev *)calloc(1, sizeof(mikesinput_dev));
 
     unsigned long fd_bits[NBITS(EV_MAX)] = {0};
@@ -83,7 +89,7 @@ void mikesinput_init_device(char *path)
     {
         ERR_BAD_DEV_PATH(path);
         free(device);
-        return;
+        return NULL;
     }
 
     ioctl(device->fd, EVIOCGBIT(0, sizeof(fd_bits)), fd_bits);
@@ -95,10 +101,10 @@ void mikesinput_init_device(char *path)
         unsigned long abs_bits[NBITS(ABS_MAX)] = {0};
 
         ioctl(device->fd, EVIOCGBIT(EV_ABS, sizeof(abs_bits)), abs_bits);
-        has_abs = IS_BIT_SET(abs_bits, ABS_X) && IS_BIT_SET(abs_bits, ABS_Y);
-        has_abs_multi = IS_BIT_SET(abs_bits, ABS_MT_POSITION_X) && IS_BIT_SET(abs_bits, ABS_MT_POSITION_Y);
+        device->has_abs = IS_BIT_SET(abs_bits, ABS_X) && IS_BIT_SET(abs_bits, ABS_Y);
+        device->has_abs_multi = IS_BIT_SET(abs_bits, ABS_MT_POSITION_X) && IS_BIT_SET(abs_bits, ABS_MT_POSITION_Y);
 
-        if (has_abs || has_abs_multi)
+        if (device->has_abs || device->has_abs_multi)
         {
             // set absolute x input min and max
             ioctl(device->fd, EVIOCGABS(ABS_X), &abs_info);
@@ -117,7 +123,7 @@ void mikesinput_init_device(char *path)
     {
         unsigned long rel_bits[NBITS(ABS_MAX)] = {0};
         ioctl(device->fd, EVIOCGBIT(EV_REL, sizeof(rel_bits)), rel_bits);
-        has_rel = IS_BIT_SET(rel_bits, REL_X) && IS_BIT_SET(rel_bits, REL_Y);
+        device->has_rel = IS_BIT_SET(rel_bits, REL_X) && IS_BIT_SET(rel_bits, REL_Y);
     }
 
     // Handle key input features.
@@ -127,7 +133,12 @@ void mikesinput_init_device(char *path)
         ioctl(device->fd, EVIOCGBIT(EV_KEY, sizeof(key_bits)), key_bits);
     }
 
+    if (device->has_abs || device->has_rel || device->has_abs_multi) {
+        return device;
+    }
 
+    free(device);
+    return NULL;
 }
 
 #endif
