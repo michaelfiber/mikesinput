@@ -38,7 +38,8 @@ typedef struct
     float y_max;
 } mikesinput_dev;
 
-mikesinput_dev devices[64] = {0};
+int device_count = 0;
+mikesinput_dev *devices[64];
 
 void mikesinput_init(void);
 mikesinput_dev *mikesinput_init_device(char *path);
@@ -72,9 +73,16 @@ void mikesinput_init(void)
                 {
                     printf("Found input device: %d\n", device->fd);
                     printf("Has abs: %d\nHas rel: %d\nHas abs multi: %d\n", device->has_abs, device->has_rel, device->has_abs_multi);
+                    devices[device_count] = device;
+                    device_count++;
                 }
             }
         }
+    }
+
+    for (int i = 0; i < device_count; i++)
+    {
+        printf("Device %d\n", i);
     }
 }
 
@@ -139,6 +147,21 @@ mikesinput_dev *mikesinput_init_device(char *path)
 
     free(device);
     return NULL;
+}
+
+void mikesinput_poll_devices()
+{
+    struct input_event ie;
+
+    for (int i = 0; i < device_count; i++)
+    {
+        while (read(devices[i]->fd, &ie, sizeof(struct input_event)))
+        {
+            if (ie.type > 0) {
+                printf("type: %d\n", ie.type);
+            }
+        }
+    }
 }
 
 #endif
