@@ -164,13 +164,7 @@ static int mikesinput_poll_mice(void);
 static int mikesinput_poll_keyboards(void);
 
 /**
- * Many devices (power buttons, webcams) can show up as keyboards.
- * Devices that show up as js# or mouse# also show up as event#.
- * So just go through all the event# devices and handle their
- * specific features detected by:
- *
- *     ioctl(fd, EVIOCG[BIT|ABS]([EV_REL|EV_ABS|EV_KEY], ...)...);
- *
+ * Use /dev/input/by-id to find devices, use the device name suffix to determine the type of device.
  */
 void mikesinput_init(void)
 {
