@@ -1,5 +1,5 @@
-#ifndef RCORE_NATIVE_INPUT
-#define RCORE_NATIVE_INPUT
+#ifndef MIKESINPUT_H
+#define MIKESINPUT_H
 
 #include <stdlib.h>
 #include <fcntl.h>
@@ -11,38 +11,157 @@
 #include <stdio.h>
 #include <stdbool.h>
 
-#define ERR_BAD_DEV_PATH(path) (printf("[MikesInput] Could not open dev path: %s\n", path))
+/*
+    Joystick axis types:
 
-#define BITS_PER_LONG (8 * sizeof(long))
-#define NBITS(x) ((((x)-1) / BITS_PER_LONG) + 1)
-#define OFF(x) ((x) % BITS_PER_LONG)
-#define BIT(x) (1UL << OFF(x))
-#define LONG(x) ((x) / BITS_PER_LONG)
-#define IS_BIT_SET(array, bit) ((array[LONG(bit)] >> OFF(bit)) & 1)
+        ABS_X           x axis
+        ABS_Y           y axis
+        ABS_Z           z axis
+        ABS_RX          x rotational axis
+        ABS_RY          y rotational axis
+        ABS_RZ          z rotational axis
+        ABS_THROTTLE    throttle
+        ABS_RUDDER      rudder
+        ABS_WHEEL       wheel
+        ABS_GAS         gas
+        ABS_BRAKE       brake
+        ABS_HAT0X       hat 0 x axis
+        ABS_HAT0Y       hat 0 y axis
+        ABS_HAT1X       hat 1 x axis
+        ABS_HAT1Y       hat 1 y axis
+        ABS_HAT2X       hat 2 x axis
+        ABS_HAT2Y       hat 2 y axis
+        ABS_HAT3X       hat 3 x axis
+        ABS_HAT3Y       hat 3 y axis
+        ABS_PRESSURE    pressure
+        ABS_DISTANCE    distance
+        ABS_TILT_X      tilt x
+        ABS_TILT_Y      tilt y
+        ABS_MISC        miscellaneous
 
-#define MIKESINPUT_DEV_PATH "/dev/input"
-#define MAX_FILEPATH_LENGTH 1024
+        BTN_JOYSTICK    joystick button?
+*/
+
+void printAxisType(int i)
+{
+    switch (i)
+    {
+    case ABS_X:
+        printf(" (X Axis) ");
+        break;
+    case ABS_Y:
+        printf(" (Y Axis) ");
+        break;
+    case ABS_Z:
+        printf(" (Z Axis) ");
+        break;
+    case ABS_RX:
+        printf(" (X Rotation Axis) ");
+        break;
+    case ABS_RY:
+        printf(" (Y Rotation Axis) ");
+        break;
+    case ABS_RZ:
+        printf(" (Z Rotation Axis) ");
+        break;
+    case ABS_THROTTLE:
+        printf(" (Throttle) ");
+        break;
+    case ABS_RUDDER:
+        printf(" (Rudder) ");
+        break;
+    case ABS_WHEEL:
+        printf(" (Wheel) ");
+        break;
+    case ABS_GAS:
+        printf(" (Accelerator) ");
+        break;
+    case ABS_BRAKE:
+        printf(" (Brake) ");
+        break;
+    case ABS_HAT0X:
+        printf(" (Hat zero, x axis) ");
+        break;
+    case ABS_HAT0Y:
+        printf(" (Hat zero, y axis) ");
+        break;
+    case ABS_HAT1X:
+        printf(" (Hat one, x axis) ");
+        break;
+    case ABS_HAT1Y:
+        printf(" (Hat one, y axis) ");
+        break;
+    case ABS_HAT2X:
+        printf(" (Hat two, x axis) ");
+        break;
+    case ABS_HAT2Y:
+        printf(" (Hat two, y axis) ");
+        break;
+    case ABS_HAT3X:
+        printf(" (Hat three, x axis) ");
+        break;
+    case ABS_HAT3Y:
+        printf(" (Hat three, y axis) ");
+        break;
+    case ABS_PRESSURE:
+        printf(" (Pressure) ");
+        break;
+    case ABS_DISTANCE:
+        printf(" (Distance) ");
+        break;
+    case ABS_TILT_X:
+        printf(" (Tilt, X axis) ");
+        break;
+    case ABS_TILT_Y:
+        printf(" (Tilt, Y axis) ");
+        break;
+    case ABS_MISC:
+        printf(" (Miscellaneous) ");
+        break;
+    default:
+        printf(" (Unknown absolute feature) ");
+    }
+}
+
+#define MI_ERR_BAD_DEV_PATH(path) (printf("[MikesInput] Could not open dev path: %s\n", path))
+
+#define MI_BITS_PER_LONG (8 * sizeof(long))
+#define MI_NBITS(x) ((((x)-1) / MI_BITS_PER_LONG) + 1)
+#define MI_OFF(x) ((x) % MI_BITS_PER_LONG)
+#define MI_BIT(x) (1UL << MI_OFF(x))
+#define MI_LONG(x) ((x) / MI_BITS_PER_LONG)
+#define MI_IS_BIT_SET(array, bit) ((array[MI_LONG(bit)] >> MI_OFF(bit)) & 1)
+
+#define MI_DEV_PATH "/dev/input/by-id"
+#define MI_MAX_FILEPATH_LENGTH 1024
+
+#define MI_JOYSTICK_MAX 10
+#define MI_MOUSE_MAX 10
+#define MI_KEYBOARD_MAX 10
 
 typedef struct
 {
+    bool is_active;
     int fd;
+    // Each joystick can have up to ABS_MAX axes.
+    bool axis_is_active[ABS_MAX];
+    struct input_absinfo axis[ABS_MAX];
+    bool buttons[KEY_MAX];
+} mikesinput_joystick;
 
-    bool has_abs;
-    bool has_rel;
-    bool has_abs_multi;
-
-    // Used for absolute input events
-    float x_min;
-    float x_max;
-    float y_min;
-    float y_max;
-} mikesinput_dev;
-
-int device_count = 0;
-mikesinput_dev *devices[64];
+// storage of up to 10 joysticks.
+static mikesinput_joystick mikesinput_joysticks[MI_JOYSTICK_MAX];
 
 void mikesinput_init(void);
-mikesinput_dev *mikesinput_init_device(char *path);
+void mikesinput_poll(void);
+
+static int mikesinput_init_joystick(char *path);
+static int mikesinput_init_mouse(char *path);
+static int mikesinput_init_keyboard(char *path);
+
+static int mikesinput_poll_joysticks(void);
+static int mikesinput_poll_mice(void);
+static int mikesinput_poll_keyboards(void);
 
 /**
  * Many devices (power buttons, webcams) can show up as keyboards.
@@ -55,113 +174,167 @@ mikesinput_dev *mikesinput_init_device(char *path);
  */
 void mikesinput_init(void)
 {
-    char path[MAX_FILEPATH_LENGTH] = {0};
+    char path[MI_MAX_FILEPATH_LENGTH] = {0};
     DIR *dir = NULL;
     struct dirent *ent = NULL;
 
-    dir = opendir(MIKESINPUT_DEV_PATH);
+    dir = opendir(MI_DEV_PATH);
 
     if (dir)
     {
+        int js_len = strlen("event-joystick");
+        int kb_len = strlen("event-kbd");
+        int ms_len = strlen("event-mouse");
+
         while ((ent = readdir(dir)) != NULL)
         {
-            if ((strncmp("event", ent->d_name, strlen("event")) == 0))
+            sprintf(path, "%s/%s", MI_DEV_PATH, ent->d_name);
+
+            if ((strncmp("event-joystick", ent->d_name + (strlen(ent->d_name) - js_len), js_len) == 0))
             {
-                sprintf(path, "%s/%s", MIKESINPUT_DEV_PATH, ent->d_name);
-                mikesinput_dev *device = mikesinput_init_device(path);
-                if (device != NULL) 
+                printf("%s is a joystick\n", path);
+                mikesinput_init_joystick(path);
+            }
+            else if ((strncmp("event-kbd", ent->d_name + (strlen(ent->d_name) - kb_len), kb_len) == 0))
+            {
+                printf("%s is a keyboard\n", path);
+            }
+            else if ((strncmp("event-mouse", ent->d_name + (strlen(ent->d_name) - ms_len), ms_len) == 0))
+            {
+                printf("%s is a mouse\n", path);
+            }
+        }
+    }
+}
+
+void mikesinput_poll(void)
+{
+    mikesinput_poll_joysticks();
+    mikesinput_poll_keyboards();
+    mikesinput_poll_mice();
+
+    for (int i = 0; i < MI_JOYSTICK_MAX; i++)
+    {
+        if (!mikesinput_joysticks[i].is_active)
+            continue;
+
+        for (int j = 0; j < ABS_MAX; j++)
+        {
+            if (!mikesinput_joysticks[i].axis_is_active[j])
+                continue;
+
+            printAxisType(j);
+            printf("%d ", mikesinput_joysticks[i].axis[j].value);
+        }
+
+        printf("\n");
+
+        for (int j = 0; j < KEY_MAX; j++)
+        {
+            printf("%d", mikesinput_joysticks[i].buttons[j]);
+        }
+
+        printf("\n");
+    }
+}
+
+static int mikesinput_init_joystick(char *path)
+{
+    for (int i = 0; i < MI_JOYSTICK_MAX; i++)
+    {
+        if (mikesinput_joysticks[i].is_active)
+            continue;
+
+        struct input_absinfo features;
+        unsigned long abs_bits[ABS_MAX / 8 + 1];
+        int fd = -1;
+
+        memset(abs_bits, 0, sizeof(abs_bits));
+
+        if ((mikesinput_joysticks[i].fd = open(path, O_RDONLY | O_NONBLOCK)) < 0)
+        {
+            return -1;
+        }
+
+        if (ioctl(mikesinput_joysticks[i].fd, EVIOCGBIT(EV_ABS, sizeof(abs_bits)), abs_bits) < 0)
+        {
+            close(mikesinput_joysticks[i].fd);
+            return -1;
+        }
+
+        for (int axis = 0; axis < ABS_MAX; axis++)
+        {
+            if (MI_IS_BIT_SET(abs_bits, axis))
+            {
+                printf("  Found axis %d", axis);
+                printAxisType(axis);
+                printf("\n");
+
+                if (ioctl(mikesinput_joysticks[i].fd, EVIOCGABS(axis), &features) == 0)
                 {
-                    printf("Found input device: %d\n", device->fd);
-                    printf("Has abs: %d\nHas rel: %d\nHas abs multi: %d\n", device->has_abs, device->has_rel, device->has_abs_multi);
-                    devices[device_count] = device;
-                    device_count++;
+                    printf("    Min: %d\n", features.minimum);
+                    printf("    Val: %d\n", features.value);
+                    printf("    Max: %d\n", features.maximum);
+                    printf("    Resolution: %d\n", features.resolution);
+                    printf("    Deadzone: %.2f%%\n", (float)features.flat * 100.0f / (float)features.maximum);
                 }
+
+                mikesinput_joysticks[i].axis_is_active[axis] = true;
             }
         }
+
+        mikesinput_joysticks[i].is_active = true;
+
+        return 0;
     }
 
-    for (int i = 0; i < device_count; i++)
-    {
-        printf("Device %d\n", i);
-    }
+    return -1;
 }
 
-mikesinput_dev *mikesinput_init_device(char *path)
+static int mikesinput_init_mouse(char *path)
 {
-    mikesinput_dev *device = (mikesinput_dev *)calloc(1, sizeof(mikesinput_dev));
-
-    unsigned long fd_bits[NBITS(EV_MAX)] = {0};
-
-    device->fd = open(path, O_RDONLY | O_NONBLOCK);
-    if (device->fd < 0)
-    {
-        ERR_BAD_DEV_PATH(path);
-        free(device);
-        return NULL;
-    }
-
-    ioctl(device->fd, EVIOCGBIT(0, sizeof(fd_bits)), fd_bits);
-
-    // Handle absolute position input features.
-    if (IS_BIT_SET(fd_bits, EV_ABS))
-    {
-        struct input_absinfo abs_info = {0};
-        unsigned long abs_bits[NBITS(ABS_MAX)] = {0};
-
-        ioctl(device->fd, EVIOCGBIT(EV_ABS, sizeof(abs_bits)), abs_bits);
-        device->has_abs = IS_BIT_SET(abs_bits, ABS_X) && IS_BIT_SET(abs_bits, ABS_Y);
-        device->has_abs_multi = IS_BIT_SET(abs_bits, ABS_MT_POSITION_X) && IS_BIT_SET(abs_bits, ABS_MT_POSITION_Y);
-
-        if (device->has_abs || device->has_abs_multi)
-        {
-            // set absolute x input min and max
-            ioctl(device->fd, EVIOCGABS(ABS_X), &abs_info);
-            device->x_min = abs_info.minimum;
-            device->x_max = abs_info.maximum;
-
-            // set absolute y input min and max
-            ioctl(device->fd, EVIOCGABS(ABS_Y), &abs_info);
-            device->y_min = abs_info.minimum;
-            device->y_max = abs_info.maximum;
-        }
-    }
-
-    // Handle relative position input features.
-    if (IS_BIT_SET(fd_bits, EV_REL))
-    {
-        unsigned long rel_bits[NBITS(ABS_MAX)] = {0};
-        ioctl(device->fd, EVIOCGBIT(EV_REL, sizeof(rel_bits)), rel_bits);
-        device->has_rel = IS_BIT_SET(rel_bits, REL_X) && IS_BIT_SET(rel_bits, REL_Y);
-    }
-
-    // Handle key input features.
-    if (IS_BIT_SET(fd_bits, EV_KEY))
-    {
-        unsigned long key_bits[NBITS(ABS_MAX)] = {0};
-        ioctl(device->fd, EVIOCGBIT(EV_KEY, sizeof(key_bits)), key_bits);
-    }
-
-    if (device->has_abs || device->has_rel || device->has_abs_multi) {
-        return device;
-    }
-
-    free(device);
-    return NULL;
 }
 
-void mikesinput_poll_devices()
+static int mikesinput_init_keyboard(char *path)
 {
-    struct input_event ie;
+}
 
-    for (int i = 0; i < device_count; i++)
+static int mikesinput_poll_joysticks(void)
+{
+    struct input_event ev;
+
+    int count = 0;
+    for (int i = 0; i < MI_JOYSTICK_MAX; i++)
     {
-        while (read(devices[i]->fd, &ie, sizeof(struct input_event)))
+        if (!mikesinput_joysticks[i].is_active)
+            continue;
+
+        count++;
+
+        while (read(mikesinput_joysticks[i].fd, &ev, sizeof(struct input_event)) > 0)
         {
-            if (ie.type > 0) {
-                printf("type: %d\n", ie.type);
+            switch (ev.type)
+            {
+            case EV_SYN:
+                return;
+            case EV_KEY:
+                mikesinput_joysticks[i].buttons[ev.code] = ev.value;
+                break;
+            case EV_ABS:
+                mikesinput_joysticks[i].axis[ev.code].value = ev.value;
+                break;
             }
         }
     }
 }
 
-#endif
+static int mikesinput_poll_mice(void)
+{
+    struct input_event ev;
+}
+
+static int mikesinput_poll_keyboards(void)
+{
+}
+
+#endif // MIKESINPUT_H
